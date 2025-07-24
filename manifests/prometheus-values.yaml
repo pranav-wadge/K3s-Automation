@@ -1,0 +1,26 @@
+resources:
+  requests:
+    cpu: 300m
+    memory: 512Mi
+  limits:
+    cpu: 700m
+    memory: 1Gi
+
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+grafana:
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1

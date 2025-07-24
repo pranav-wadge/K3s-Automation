@@ -1,0 +1,14 @@
+# uptime-cert.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: uptime-kuma-cert
+  namespace: monitoring
+spec:
+  secretName: uptime-kuma-cert
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: uptime.pranavwadge.cloud
+  dnsNames:
+    - uptime.pranavwadge.cloud

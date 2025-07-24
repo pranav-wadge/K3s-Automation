@@ -1,0 +1,105 @@
+---
+# PriorityClass (define once in your cluster if not already)
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: medium-priority
+value: 100000
+globalDefault: false
+description: "Medium priority for user-facing workloads"
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simplehttp-deployment
+  namespace: simple-http
+spec:
+  selector:
+    matchLabels:
+      app: simplehttp
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: simplehttp
+    spec:
+      priorityClassName: medium-priority
+      containers:
+      - name: simplehttp
+        image: pareshpawar/simple-http-server:latest
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 8081
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: simplehttp-service
+  namespace: simple-http
+spec:
+  type: ClusterIP
+  selector:
+    app: simplehttp
+  ports:
+  - port: 8009
+    targetPort: 8081
+
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: simplehttp-ingress
+  namespace: simple-http
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - simple.pranavwadge.cloud
+      secretName: simplehttp-tls
+  rules:
+    - host: simple.pranavwadge.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: simplehttp-service
+                port:
+                  number: 8009
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: simplehttp-hpa
+  namespace: simple-http
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: simplehttp-deployment
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50

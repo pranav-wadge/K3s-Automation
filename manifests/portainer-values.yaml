@@ -1,0 +1,19 @@
+service:
+  type: LoadBalancer
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+  tls:
+    - hosts:
+        - portainer.pranavwadge.cloud
+      secretName: portainer-tls
+  hosts:
+    - host: portainer.pranavwadge.cloud
+      paths:
+        - path: /
+          pathType: Prefix

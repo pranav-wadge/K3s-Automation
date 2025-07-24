@@ -1,0 +1,209 @@
+---
+# DYNAMIC PVC: Media Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-shoes-pvc
+  namespace: simple-http
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# DYNAMIC PVC: DB Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-shoes-db-pvc
+  namespace: simple-http
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
+
+---
+# STATIC PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-shoes-static-pvc
+  namespace: simple-http
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 512Mi
+  volumeName: my-shoes-static-pv
+  storageClassName: ""
+
+---
+# STATIC PV
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: my-shoes-static-pv
+spec:
+  capacity:
+    storage: 512Mi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data/my-shoes-static"
+  persistentVolumeReclaimPolicy: Retain
+
+---
+# MIDDLEWARE: Redirect root `/` to `/admin/login/`
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: redirect-root-to-admin
+  namespace: simple-http
+spec:
+  redirectRegex:
+    regex: ^/$
+    replacement: /admin/login/
+    permanent: true
+
+---
+# MIDDLEWARE: Rewrite `/media/*` to `/static/*`
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: rewrite-media-to-static
+  namespace: simple-http
+spec:
+  replacePathRegex:
+    regex: ^/media/(.*)
+    replacement: /static/$1
+
+---
+# DEPLOYMENT
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-shoes-deployment
+  namespace: simple-http
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: my-shoes
+  template:
+    metadata:
+      labels:
+        app: my-shoes
+    spec:
+      containers:
+      - name: my-shoes
+        image: harshal001/my-shoes-app-clean:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /admin/login/
+            port: 80
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        livenessProbe:
+          httpGet:
+            path: /admin/login/
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        volumeMounts:
+        - name: shoes-storage
+          mountPath: /app/Ecom/public/media
+        - name: db-storage
+          mountPath: /app/db
+        - name: static-storage
+          mountPath: /app/Ecom/public/static
+        resources:
+          requests:
+            cpu: "100m"            # reduced for easier scheduling
+            memory: "256Mi"
+          limits:
+            cpu: "250m"
+            memory: "512Mi"
+      volumes:
+      - name: shoes-storage
+        persistentVolumeClaim:
+          claimName: my-shoes-pvc
+      - name: db-storage
+        persistentVolumeClaim:
+          claimName: my-shoes-db-pvc
+      - name: static-storage
+        persistentVolumeClaim:
+          claimName: my-shoes-static-pvc
+
+---
+# SERVICE
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-shoes-service
+  namespace: simple-http
+spec:
+  selector:
+    app: my-shoes
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+
+---
+# INGRESS
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-shoes-ingress
+  namespace: simple-http
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: simple-http-redirect-root-to-admin@kubernetescrd
+spec:
+  tls:
+    - hosts:
+        - shoes.pranavwadge.cloud
+      secretName: shoes-cert
+  rules:
+    - host: shoes.pranavwadge.cloud
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: my-shoes-service
+                port:
+                  number: 80
+
+---
+# HPA: Auto-scale on CPU usage
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: my-shoes-hpa
+  namespace: simple-http
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: my-shoes-deployment
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 60

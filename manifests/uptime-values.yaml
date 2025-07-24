@@ -1,0 +1,40 @@
+config:
+  provider: oidc
+  clientID: uptime-kuma
+  clientSecret: V0WmAQznrU10EdpE8ZBrhgw3si0bSGX8  # from Keycloak
+  cookieSecret: 15f7a1e41a5d0ab7536edfe0f7e9cb0a       # 16 bytes hex
+  oidcIssuerURL: https://key.pranavwadge.cloud/realms/master
+  redirectURL: https://uptime.pranavwadge.cloud/oauth2/callback
+  emailDomains:
+    - "*"
+  cookieSecure: true
+
+extraArgs:
+  - --provider=oidc
+  - --oidc-issuer-url=https://key.pranavwadge.cloud/realms/master
+  - --client-id=uptime-kuma
+  - --client-secret=V0WmAQznrU10EdpE8ZBrhgw3si0bSGX8
+  - --redirect-url=https://uptime.pranavwadge.cloud/oauth2/callback
+  - --upstream=http://uptime-kuma.simple-http.svc.cluster.local:3001
+  - --set-xauthrequest=true
+  - --skip-provider-button=true
+  - --provider-display-name="Login with Keycloak"
+  - --scope=openid email profile
+  - --ssl-insecure-skip-verify=true
+
+service:
+  type: ClusterIP
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+  hosts:
+    - uptime.pranavwadge.cloud
+  tls:
+    - secretName: uptime-kuma-cert
+      hosts:
+        - uptime.pranavwadge.cloud

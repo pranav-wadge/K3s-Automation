@@ -1,0 +1,37 @@
+---
+adminUser: admin
+adminPassword: admin
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-server.monitoring.svc.cluster.local
+        access: proxy
+        isDefault: true
+
+grafana.ini:
+  server:
+    root_url: https://grafana.pranavwadge.cloud
+  auth:
+    disable_login_form: false       # ✅ Show default Grafana login
+    oauth_auto_login: false         # ✅ Do not auto-redirect to Keycloak
+  auth.generic_oauth:
+    enabled: true
+    name: Keycloak
+    allow_sign_up: true
+    client_id: grafana
+    client_secret: $__file{/etc/secrets/grafana-client-secret/GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}
+    scopes: "openid email profile"
+    auth_url: https://key.pranavwadge.cloud/realms/master/protocol/openid-connect/auth?prompt=login   # ✅ This forces login screen
+    token_url: https://key.pranavwadge.cloud/realms/master/protocol/openid-connect/token
+    api_url: https://key.pranavwadge.cloud/realms/master/protocol/openid-connect/userinfo
+    email_attribute_name: email
+    login_attribute_path: preferred_username
+    role_attribute_path: "contains(realm_access.roles[*], 'admin') && 'Admin' || 'Viewer'"
+    tls_skip_verify_insecure: true
+    use_pkce: true
+
+envFromSecret: grafana-client-secret

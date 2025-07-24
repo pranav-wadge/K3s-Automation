@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: loki-cert
+  namespace: monitoring
+spec:
+  secretName: loki-cert
+  dnsNames:
+    - loki.pranavwadge.cloud
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer

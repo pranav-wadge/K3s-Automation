@@ -1,0 +1,52 @@
+# uptime-deployment.yaml
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: low-priority
+value: 1000
+globalDefault: false
+description: "Lower priority for non-critical apps like uptime-kuma"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: uptime-kuma
+  namespace: simple-http
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: uptime-kuma
+  template:
+    metadata:
+      labels:
+        app: uptime-kuma
+    spec:
+      priorityClassName: low-priority
+      containers:
+        - name: uptime-kuma
+          image: louislam/uptime-kuma:1
+          ports:
+            - containerPort: 3001
+          volumeMounts:
+            - name: uptime-kuma-data
+              mountPath: /app/data
+      volumes:
+        - name: uptime-kuma-data
+          hostPath:
+            path: /mnt/data/uptime-kuma-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: uptime-kuma
+  namespace: simple-http
+spec:
+  selector:
+    app: uptime-kuma
+  type: ClusterIP
+  ports:
+    - port: 3001
+      targetPort: 3001

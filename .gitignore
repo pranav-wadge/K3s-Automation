@@ -1,0 +1,10 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# System
+*.log
+__pycache__/
+*.pem
+*.env
